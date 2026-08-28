@@ -1,0 +1,13 @@
+# Ignorar arquivos de dados pesados
+*.csv
+*.geojson
+*.parquet
+/dados/
+
+# Ignorar pastas virtuais e caches do Python
+__pycache__/
+.pytest_cache/
+*.pyc
+.env
+.venv/
+env/
