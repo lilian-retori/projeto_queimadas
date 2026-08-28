@@ -3,7 +3,7 @@ import pandas as pd
 import geopandas as gpd
 import geobr
 from config import CRS_PADRAO, ESTADO_ALVO, URL_NASA_FIRMS
-
+''
 def extrair_e_limpar_dados():
     # 1. Leitura direta de endpoints para a memória
     df_nasa = pd.read_csv(URL_NASA_FIRMS)

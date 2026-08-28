@@ -1,58 +1,63 @@
-import geopandas as gpd
-import pandas as pd
 import schedule
 import time
+import pandas as pd
+import geopandas as gpd
 from datetime import datetime
+from shapely.geometry import Point
 
-# Substitua pela URL da API que fornecerá os dados (ex: INPE, NASA FIRMS)
-# O GeoPandas consegue ler arquivos GeoJSON diretamente da web.
-API_URL = "https://api.exemplo.com/focos_calor.geojson"
+# Importando a sua arquitetura
+from config import CRS_PADRAO
+from etl import extrair_e_limpar_dados
+from features import fabricar_features_espaciais
+from predict import gerar_previsoes_modelo
 
 def pipeline_previsao_queimadas():
-    print(f"[{datetime.now()}] Iniciando a coleta e previsão de queimadas...")
+    print(f"\n[{datetime.now()}] Iniciando a coleta e previsão autônoma...")
 
     try:
-        # 1. INGESTÃO: Leitura direta da API para a memória (sem baixar arquivo físico)
-        print(" -> Baixando dados...")
-        gdf = gpd.read_file(API_URL)
-
-        # 2. LIMPEZA: Remover dados corrompidos ou sem localização
-        gdf = gdf[gdf.geometry.notnull()]
-
-        # 3. TRANSFORMAÇÃO: Desestruturação da geometria (Lat/Lon)
-        # Modelos de Machine Learning geralmente exigem colunas numéricas em vez de objetos geométricos.
-        gdf['latitude'] = gdf.geometry.y
-        gdf['longitude'] = gdf.geometry.x
-
-        # Remover a coluna geométrica para focar apenas nos dados tabulares
-        df_tabular = pd.DataFrame(gdf.drop(columns='geometry'))
-
-        # 4. PREDIÇÃO: Integração com o seu modelo de Machine Learning
-        # Exemplo hipotético de injeção de dados no modelo:
-        # df_tabular['risco_predito'] = meu_modelo_ml.predict(df_tabular[['latitude', 'longitude', 'temperatura', 'umidade']])
+        # 1. ETL (Extração e Limpeza)
+        print(" Passo 1: Extraindo dados recentes...")
+        gdf_focos = extrair_e_limpar_dados()
         
-        print(f" -> Processados e analisados {len(df_tabular)} registros.")
+        if gdf_focos.empty:
+            print(" Nenhum foco no estado hoje. Fim do ciclo.")
+            return
 
-        # 5. ARMAZENAMENTO: Salvar no seu banco de dados (ex: PostgreSQL/PostGIS)
-        # from sqlalchemy import create_engine
-        # engine = create_engine('postgresql://usuario:senha@localhost:5432/meubanco')
-        # df_tabular.to_sql('tabela_previsoes', engine, if_exists='append', index=False)
+        # 2. FEATURES (Cruzamento Espacial)
+        print(" Passo 2: Cruzando com dados climáticos...")
+        # Simulando uma leitura de API de clima para o código não quebrar na primeira execução
+        gdf_clima_api = gpd.GeoDataFrame(
+            {'estacao_id': ['EST-01'], 'temperatura': [35.0]},
+            geometry=[Point(-55.0, -12.0)], crs=CRS_PADRAO
+        )
+        df_features = fabricar_features_espaciais(gdf_focos, gdf_clima_api)
 
-        print(f"[{datetime.now()}] Ciclo finalizado com sucesso!\n")
+        # 3. PREDIÇÃO (Chamando o modelo .joblib)
+        print(" Passo 3: Rodando o modelo de Machine Learning...")
+        # Garante que as colunas que o predict.py espera existam na tabela final
+        if 'temperatura' not in df_features.columns:
+            df_features['temperatura'] = 35.0 
+            
+        df_final = gerar_previsoes_modelo(df_features)
+
+        # 4. ARMAZENAMENTO
+        print(f" -> Sucesso! {len(df_final)} previsões geradas prontas para o Dashboard.")
+        # Opcional: df_final.to_sql('tabela_previsoes', engine, if_exists='append', index=False)
+        print(f"[{datetime.now()}] Ciclo finalizado!\n")
 
     except Exception as e:
-        print(f"[{datetime.now()}] Erro durante o processamento: {e}")
+        print(f"[{datetime.now()}] ERRO CRÍTICO no pipeline: {e}")
 
-# AGENDAMENTO: Configura a rotina para rodar autonomamente (ex: a cada 6 horas)
+# Configura para rodar sozinho a cada 6 horas
 schedule.every(6).hours.do(pipeline_previsao_queimadas)
 
 if __name__ == "__main__":
     print("Serviço de Previsão de Queimadas iniciado. Aguardando a janela de agendamento...")
     
-    # Executa a função uma vez imediatamente ao ligar o servidor (opcional)
+    # Descomente a linha abaixo se quiser que ele rode na mesma hora em que ligar o script, 
+    # antes de começar a esperar as 6 horas
     # pipeline_previsao_queimadas()
 
-    # Loop infinito que mantém o script vivo verificando o relógio
     while True:
         schedule.run_pending()
-        time.sleep(60) # Pausa de 1 minuto para não sobrecarregar a CPU
+        time.sleep(60)

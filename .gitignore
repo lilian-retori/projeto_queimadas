@@ -1,10 +1,14 @@
-# Ignorar arquivos de dados pesados
+# Ignorar arquivos de dados pesados do passado
 *.csv
 *.geojson
 *.parquet
 /dados/
 
-# Ignorar pastas virtuais e caches do Python
+# Ignorar os "cérebros" treinados pesados
+*.joblib
+/modelos/
+
+# Ignorar pastas virtuais e caches automáticos do Python
 __pycache__/
 .pytest_cache/
 *.pyc
